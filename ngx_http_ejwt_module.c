@@ -490,7 +490,7 @@ ngx_http_ejwt_auth_reply(ngx_http_request_t *r, ngx_str_t *realm, ngx_http_ejwt_
         if( realm->len ) {
             *++p = ',';
         }
-        p  = ngx_cpymem(++p, " error=\"invalid_token\", error_description=\""
+        p  = ngx_cpymem(p, " error=\"invalid_token\", error_description=\""
                 , sizeof(" error=\"invalid_token\", error_description=\"") - 1);
         p  = ngx_cpymem(p, errors[err].data, errors[err].len);
         *p = '"';
