@@ -13,12 +13,12 @@
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
 
-#define NGX_TNS_EJWT_VERSION            "0.0.3"
+#define NGX_TNS_EJWT_VERSION            "0.0.4"
 
 #define NGX_HTTP_EJWT_MD_LEN            256/8 /* HS256 only */
 
 #define NGX_HTTP_EJWT_MODE_OFF          0x0000
-#define NGX_HTTP_EJWT_MODE_PRASE        0x1000 
+#define NGX_HTTP_EJWT_MODE_PARSE        0x1000 
 #define NGX_HTTP_EJWT_MODE_AUTH_HS256   0x0001
 #define NGX_HTTP_EJWT_MODE_AUTH_HS384   0x0002
 #define NGX_HTTP_EJWT_MODE_AUTH_HS512   0x0004
@@ -120,7 +120,7 @@ static ngx_str_t ngx_http_ejwt_var_auth_str = ngx_string("ejwt_auth");
 //static ngx_str_t ngx_http_ejwt_def_desc = ngx_string("Invalid credentials");
 static ngx_conf_enum_t  ngx_http_ejwt_mode_set[] = {
     { ngx_string("off"),     NGX_HTTP_EJWT_MODE_OFF },
-    { ngx_string("parse"),   NGX_HTTP_EJWT_MODE_PRASE },
+    { ngx_string("parse"),   NGX_HTTP_EJWT_MODE_PARSE },
     { ngx_string("hs256"),   NGX_HTTP_EJWT_MODE_AUTH_HS256 },
     { ngx_string("rs256"),   NGX_HTTP_EJWT_MODE_AUTH_RS256 },
     { ngx_string("hmac"),    NGX_HTTP_EJWT_MODE_AUTH_HMAC },
@@ -268,7 +268,7 @@ ngx_int_t ngx_http_ejwt_handler(ngx_http_request_t *r)
 
     ngx_http_set_ctx(r, ctx, ngx_http_ejwt_module);
 
-    if( lcf->mode == NGX_HTTP_EJWT_MODE_PRASE )
+    if( lcf->mode == NGX_HTTP_EJWT_MODE_PARSE )
         return NGX_OK;
 
     if( ctx->exp && (time_t)ctx->exp < ngx_time() )
@@ -336,7 +336,7 @@ ngx_http_ejwt_split_token(ngx_pool_t *pool, ngx_http_ejwt_ctx_t *ctx)
     size_t       len;
     int          i;
     u_char      *p, *buf;
-    ngx_str_t    partd[3], part[3];
+    ngx_str_t    partd[3], part[3] = {{0,0}, {0,0}, {0,0}};
 
     part[0] = ctx->token;
 
@@ -617,6 +617,9 @@ ngx_http_ejwt_auth_reply(ngx_http_request_t *r, ngx_str_t *realm, ngx_http_ejwt_
         ngx_string("token expired"),
         ngx_string("access forbidden")
     };
+
+    if( realm->len == NGX_CONF_UNSET_SIZE )
+        return NGX_HTTP_UNAUTHORIZED;
 
     r->headers_out.www_authenticate = ngx_list_push(&r->headers_out.headers);
     if( r->headers_out.www_authenticate == NULL ) {
@@ -903,7 +906,6 @@ ngx_http_ejwt_conf_merge(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->cookie, prev->cookie, "");
     ngx_conf_merge_str_value(conf->claim, prev->claim, "");
     ngx_conf_merge_str_value(conf->var, prev->var, "");
-    ngx_conf_merge_str_value(conf->realm, prev->realm, "");
     ngx_conf_merge_ptr_value(conf->auth, prev->auth
             , NGX_CONF_UNSET_PTR);
     ngx_conf_merge_ptr_value(conf->hmac_ctx, prev->hmac_ctx
@@ -914,6 +916,14 @@ ngx_http_ejwt_conf_merge(ngx_conf_t *cf, void *parent, void *child)
             , NGX_CONF_UNSET_PTR);
     ngx_conf_merge_ptr_value(conf->rsa_old, prev->rsa_old
             , NGX_CONF_UNSET_PTR);
+
+    if( conf->realm.data == NULL )
+    {
+        if( prev->realm.data )
+            conf->realm = prev->realm;
+        else 
+            conf->realm.len = NGX_CONF_UNSET_SIZE;
+    }
 
     if( conf->mode & NGX_HTTP_EJWT_MODE_AUTH_HMAC 
             && conf->hmac_ctx == NGX_CONF_UNSET_PTR )
